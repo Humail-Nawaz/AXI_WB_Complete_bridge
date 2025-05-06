@@ -15,7 +15,6 @@ module complete_bridge
 
    input wire [31:0] i_mwb_rdt,
    input wire i_mwb_ack,
- 
    
    //WB2AXI WISHBONE SIGNALS FROM SERVING TO BRIDGE
    input wire [AW-1:2] i_swb_adr,
@@ -96,9 +95,6 @@ reg arbiter;
  assign o_bresp = 2'b00;
  assign o_rresp = 2'b00;
  assign o_rlast = 1'b1;
- assign i_bmresp = 2'b00;
- assign i_rmresp = 2'b00;
- assign i_rmlast = 1'b1;
 
 // present state sequential logic
 always @(posedge i_clk)  begin
@@ -150,7 +146,7 @@ end
           o_awmaddr <= {AW{1'b0}};
           o_awmvalid <= 1'b0;
           o_armvalid <= 1'b0;
-          o_armaddr <= 32'b0;
+          o_armaddr <= {AW{1'b0}};
           o_wmdata <= 32'b0;
           o_wmstrb <= 4'b0;
           o_wmvalid <= 1'b0;
@@ -179,11 +175,12 @@ end
           o_bvalid <= 1'b0;
           o_rdata <= 32'b0;
           o_rvalid <= 1'b0;
+          arbiter <= 1'b1;
          //AXI SIGNALS (WB2AXI)
           o_awmaddr <= {AW{1'b0}};
           o_awmvalid <= 1'b0;
           o_armvalid <= 1'b0;
-          o_armaddr <= 32'b0;
+          o_armaddr <= {AW{1'b0}};
           o_wmdata <= 32'b0;
           o_wmstrb <= 4'b0;
           o_wmvalid <= 1'b0;
@@ -259,36 +256,29 @@ end
         AXI2WB_BAXI : begin
                       o_bvalid <= 1'b1;
                       if (i_bready) begin
-                            o_bvalid <= 1'b0;    
-                     
+                           o_bvalid <= 1'b0;    
                       end                    
                end
 
         AXI2WB_RRAXI : begin
                       o_rvalid <= 1'b1;
-                      if (i_rready) begin
-                            o_rvalid <= 1'b0;
-                     
-                      end
-               end      //AXI2WB Bridge states end 
+                      if (i_rready)
+                         o_rvalid <= 1'b0;
+                     end      //AXI2WB Bridge states end 
 
 ///   WB2AXI BRIDGE AND STATES START  ////
-      WB2AXI_start: begin   //1  
-         if(i_swb_stb) begin //2 
-                   if(i_swb_we) begin //3 
-                     o_awmvalid <= 1'b1;
-                       if(i_awmready) begin //4   
-                            o_awmaddr[AW-1:2] <= i_swb_adr[AW-1:2] ;
-                            o_wmvalid <= 1'b1;
-                       end //4
-                     end //3
-                   else  begin //5
-                         o_armvalid <= 1'b1;
-                         if(i_armready)  
-                            o_armaddr <= i_swb_adr ;    
-                  end //5
-              end //2
-         end//1
+     WB2AXI_start: begin
+            o_swb_ack <= 1'b0;
+            if (i_swb_stb) begin
+                if (i_swb_we && i_awmready) begin
+                    o_awmaddr <= {i_swb_adr, 2'b00}; // Convert word address to byte address
+                    o_awmvalid <= 1'b1;
+                end else if (!i_swb_we && i_armready) begin
+                    o_armaddr <= {i_swb_adr, 2'b00};
+                    o_armvalid <= 1'b1;
+                end
+            end
+        end
          
       WBWRITE: begin
           o_wmvalid <=1'b1;
@@ -301,15 +291,23 @@ end
     WB2AXI_WRESP: begin
            o_bmready <=1'b1;
            if(i_bmvalid) begin
-                o_swb_ack <=1'b1;
+                      if (i_bmresp != 2'b00)
+                           $display("Error while writing");
+                        else  begin
+                           $display("Successfully data written");
+                           o_swb_ack <=1'b1; end
            end     
     end 
     
      WBREAD: begin
           o_rmready <=1'b1;
           if(i_rmvalid) begin
+             if (i_rmresp != 2'b00)
+                   $display("Error while reading data");
+              else if(i_rmlast) begin
              o_swb_rdt <= i_rmdata;
-             o_swb_ack <= 1'b1;        
+             o_swb_ack <= 1'b1;
+                $display("Successfully data read"); end      
           end 
       end
      default: begin
@@ -324,7 +322,7 @@ end
           o_awmaddr <= {AW{1'b0}};
           o_awmvalid <= 1'b0;
           o_armvalid <= 1'b0;
-          o_armaddr <= 32'b0;
+          o_armaddr <= {AW{1'b0}};
           o_wmdata <= 32'b0;
           o_wmstrb <= 4'b0;
           o_wmvalid <= 1'b0;
