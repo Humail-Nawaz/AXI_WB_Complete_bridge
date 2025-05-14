@@ -298,7 +298,7 @@ end
                                            if (i_bmresp != 2'b00)
                                                 $display("Error while writing");
                                              else  begin
-                                                $display("Successfully data written");
+                                                $display("Successfully data written --- message from bridge");
                                                  end
                                 end     
                          end 
@@ -313,7 +313,7 @@ end
                                           end else if (i_rmlast) begin
                                               o_swb_rdt <= i_rmdata;
                                               o_swb_ack <= 1'b1;
-                                              $display("Successfully data read");
+                                              $display("Successfully data read -----message from bridge");
                                           end
                              end
                           default: begin
